@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comisiones Consultoras</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--ink:#172033;--muted:#687286;--line:#d8dee8;--soft:#f6f8fb;--accent:#183b66;--good:#087b55;--warn:#9b5b00;--bad:#a52828}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:white;font-size:12px}
+    header{padding:18px 22px 14px;border-bottom:1px solid #ccd4df;position:sticky;top:0;background:white;z-index:5}h1{margin:0 0 3px;font-size:20px}.muted{color:var(--muted)}
+    main{padding:14px 18px 28px}.panel{border:1px solid var(--line);border-radius:6px;background:white;margin-bottom:10px}.controls{padding:12px;display:grid;grid-template-columns:minmax(260px,1.2fr) repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end}
+    label{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}input,select,button{font:inherit}input,select{height:32px;border:1px solid #c9d1dc;border-radius:4px;padding:5px 7px;background:white;color:var(--ink)}button{height:32px;border:1px solid #aeb8c5;border-radius:4px;padding:0 12px;font-weight:700;background:white;white-space:nowrap;cursor:pointer}.primary{background:var(--accent);border-color:var(--accent);color:white}.danger{border-color:#d8a2a2;color:#8c1f1f}
+    .auth{max-width:460px;margin:70px auto;padding:22px}.auth h2{font-size:20px;margin:0 0 12px}.auth .stack{display:grid;gap:10px}.hidden{display:none!important}
+    .summary{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:1px;background:var(--line);overflow:hidden}.metric{background:white;padding:10px 12px;min-height:64px}.metric span{display:block;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}.metric strong{font-size:18px}
+    .table-wrap{border:1px solid var(--line);border-radius:4px;overflow:auto;max-height:calc(100vh - 250px);margin-bottom:10px}table{width:100%;border-collapse:separate;border-spacing:0;min-width:1450px;font-size:11px}th{position:sticky;top:0;background:#f8fafc;border-bottom:1px solid var(--line);color:#445066;text-align:left;padding:7px 6px;font-size:10px;text-transform:uppercase;letter-spacing:.03em;z-index:2}td{border-bottom:1px solid #edf0f4;padding:5px 6px;vertical-align:middle;background:white}.num{text-align:right}.center{text-align:center}.money{white-space:nowrap;font-variant-numeric:tabular-nums}.mini{height:28px;min-width:108px;font-size:11px}.pill{display:inline-flex;align-items:center;justify-content:center;min-width:70px;height:21px;border-radius:4px;padding:0 8px;font-size:10px;font-weight:800;background:#edf5f2;color:var(--accent);white-space:nowrap}.pill.warn{background:#fff6e8;color:var(--warn)}.pill.bad{background:#fff0f0;color:var(--bad)}.toggle{width:52px;height:26px;padding:0;font-size:11px}.toggle.active{background:#172033;color:white}.date-stack{display:grid;gap:2px;white-space:nowrap}.date-stack span{color:var(--muted);font-size:10px}
+    .settings{padding:12px}.settings h2{font-size:13px;margin:0 0 10px}.settings-grid{overflow-x:auto;margin-bottom:14px}.rates,.history{width:100%;min-width:720px;border-collapse:collapse;font-size:11px}.rates th,.rates td,.history th,.history td{border-bottom:1px solid #edf0f4;padding:7px 8px;position:static}.rates input{width:100%;text-align:center}.note{margin-top:8px;color:var(--muted);font-size:11px;border-top:1px solid var(--line);padding-top:8px}
+  </style>
+</head>
+<body>
+  <header><h1>Calculadora de Comisiones para Consultoras</h1><div class="muted" id="userLine">Version Vercel + Supabase.</div></header>
+
+  <section id="authBox" class="panel auth">
+    <h2>Ingresar al sistema</h2>
+    <div class="stack">
+      <label>Email<input id="authEmail" type="email" autocomplete="email"></label>
+      <label>Contrasena<input id="authPassword" type="password" autocomplete="current-password"></label>
+      <button class="primary" id="loginBtn">Ingresar</button>
+      <button id="signupBtn">Crear usuario</button>
+      <div class="muted" id="authStatus">Usa el email habilitado para el sistema.</div>
+    </div>
+  </section>
+
+  <main id="app" class="hidden">
+    <section class="panel controls">
+      <label>CSV exportado<input id="fileInput" type="file" accept=".csv,text/csv"></label>
+      <label>Consultora<input id="consultantName" type="text"></label>
+      <label>Mes a liquidar<select id="monthFilter"></select></label>
+      <label>Jerarquia<select id="levelSelect"><option value="junior">Junior</option><option value="senior">Senior</option></select></label>
+      <button class="primary" id="importBtn">Importar CSV</button>
+      <button class="primary" id="exportBtn">Exportar liquidacion</button>
+      <button class="danger" id="logoutBtn">Salir</button>
+    </section>
+    <section class="panel controls">
+      <label>Fecha liquidacion<input id="liquidationDate" type="date"></label>
+      <label>Bono grilla 48h antes<input id="earlyBonus" type="number" value="25000"></label>
+      <label>Bono productividad<input id="productivityBonus" type="number" value="200000"></label>
+      <label>Minimo productividad<input id="productivityMin" type="number" value="6"></label>
+      <button id="saveMonthBtn">Guardar mes</button>
+      <div class="muted" id="status"></div>
+    </section>
+    <section class="summary panel">
+      <div class="metric"><span>Procesos del mes</span><strong id="closedCount">0</strong></div>
+      <div class="metric"><span>Cierre</span><strong id="closingTotal">Gs. 0</strong></div>
+      <div class="metric"><span>Grilla en tiempo</span><strong id="gridTotal">Gs. 0</strong></div>
+      <div class="metric"><span>Garantia liberada</span><strong id="guaranteeTotal">Gs. 0</strong></div>
+      <div class="metric"><span>Bonos</span><strong id="bonusTotal">Gs. 0</strong></div>
+      <div class="metric"><span>Total</span><strong id="grandTotal">Gs. 0</strong></div>
+    </section>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ref</th><th>Cliente / proceso</th><th>Mes</th><th>Categoria</th><th>Salario</th><th>Inicio busqueda</th><th>Factura</th><th>Vence grilla</th><th>Envio grilla</th><th>Inicio postulante</th><th>Garantia 60 dias</th><th>Estado</th><th>Garantia</th><th class="num">Comision</th></tr></thead>
+        <tbody id="processRows"></tbody>
+      </table>
+    </div>
+    <section class="panel settings">
+      <h2>Parametros</h2>
+      <div class="settings-grid"><table class="rates"><thead><tr><th>Categoria</th><th>Rango salario</th><th>Dias habiles grilla</th><th>Comision</th><th>Grilla 20%</th><th>Calidad 50%</th><th>Cierre 30%</th></tr></thead><tbody id="ratesRows"></tbody></table></div>
+      <h2>Liquidaciones guardadas</h2>
+      <div class="settings-grid"><table class="history"><thead><tr><th>Fecha</th><th>Consultora</th><th>Mes</th><th>Procesos</th><th class="num">Total</th></tr></thead><tbody id="historyRows"></tbody></table></div>
+      <div class="note">Politica desde julio. Los procesos marcados como garantia no suman comision. Las garantias de julio quedan visibles hasta que se decida cerrar ese arranque manualmente.</div>
+    </section>
+  </main>
+
+<script>
+const SUPABASE_URL = 'TU_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const POLICY_START_MONTH = 'Jul';
+const RATES = {
+  50000:{name:'Analista',days:7,range:'Menos de Gs. 4.500.000'},
+  100000:{name:'Auxiliar',days:10,range:'Gs. 4.500.000 a 8.999.999'},
+  200000:{name:'Jefatura',days:12,range:'Gs. 9.000.000 a 13.999.999'},
+  400000:{name:'Gerencia',days:15,range:'Gs. 14.000.000 o mas'}
+};
+let currentUser=null, settings=null, rows=[], paidGuarantees=new Set(), liquidations=[];
+const $ = id => document.getElementById(id);
+const money = n => 'Gs. ' + (Number(n)||0).toLocaleString('es-PY');
+const toNumber = v => Number(String(v ?? '').replace(/[^\d,-]/g,'').replace(',','.')) || 0;
+const todayInput = () => new Date().toISOString().slice(0,8) + '15';
+function parseDate(v){ if(!v)return null; const s=String(v).trim(); if(!s)return null; if(s.includes('/')){const [d,m,y]=s.split('/').map(Number); return new Date(y,m-1,d)} const [y,m,d]=s.slice(0,10).split('-').map(Number); return new Date(y,m-1,d)}
+function inputDate(d){ if(!(d instanceof Date)||isNaN(d))return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+function displayDate(v){ const d=parseDate(v); return d ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : '' }
+function normalizeDate(v){ const d=parseDate(v); return d ? inputDate(d) : null }
+function addBusinessDays(v, days){ const d=parseDate(v); if(!d)return ''; let left=Number(days)||0; while(left>0){d.setDate(d.getDate()+1); if(d.getDay()!==0&&d.getDay()!==6)left--} return inputDate(d)}
+function addCalendarDays(v, days){ const d=parseDate(v); if(!d)return ''; d.setDate(d.getDate()+(Number(days)||0)); return inputDate(d)}
+function diffDays(a,b){ const x=parseDate(a), y=parseDate(b); if(!x||!y)return null; return Math.round((y-x)/86400000)}
+function monthFromDate(v){ const d=parseDate(v); return d ? MONTHS[d.getMonth()] : '' }
+function monthIndex(m){ return MONTHS.indexOf(m) }
+function scaleForSalary(s){ const n=toNumber(s); if(n<4500000)return 50000; if(n<=8999999)return 100000; if(n<=13999999)return 200000; return 400000 }
+function parts(scale){ const total=toNumber(scale); return {total,grid:Math.round(total*.2),guarantee:Math.round(total*.5),closing:Math.round(total*.3)} }
+function rate(scale){ return RATES[scale] || RATES[50000] }
+function first(item,names){ for(const n of names){ if(item[n])return item[n] } return '' }
+function estimateStart(invoiceDate, days){ const d=parseDate(invoiceDate); if(!d||!days)return ''; d.setDate(d.getDate()-days); return inputDate(d)}
+function parseCsv(text){ const out=[]; let row=[], cell='', q=false; const s=text.replace(/^\uFEFF/,''); for(let i=0;i<s.length;i++){const c=s[i], next=s[i+1]; if(c=='"'&&q&&next=='"'){cell+='"';i++}else if(c=='"'){q=!q}else if(c==';'&&!q){row.push(cell);cell=''}else if((c=='\n'||c=='\r')&&!q){if(c=='\r'&&next=='\n')i++; row.push(cell); out.push(row); row=[]; cell=''}else cell+=c} if(cell||row.length){row.push(cell); out.push(row)} return out}
+function extractFacturadas(csvRows){ const marker=csvRows.findIndex(r=>r[0]==='Posiciones facturadas'); if(marker<0)return []; const headers=csvRows[marker+1]||[]; const data=[]; for(let i=marker+2;i<csvRows.length;i++){const r=csvRows[i]; if(!r.length||r.every(c=>!c))break; const item={}; headers.forEach((h,j)=>item[h]=r[j]||''); const invoiceDate=normalizeDate(first(item,['Fecha cierre','Fecha facturacion','Fecha facturación','Fecha de cierre'])); const searchStart=normalizeDate(first(item,['Fecha creacion','Fecha creación','Fecha busqueda','Fecha búsqueda','Fecha inicio'])) || estimateStart(invoiceDate,toNumber(item['Dias hasta facturacion'])); data.push({user_id:currentUser.id,ref_id:item['Ref ID'],month_label:monthFromDate(invoiceDate)||item.Mes,search_name:item.Busqueda,client_name:item.Cliente,process_type:item.Tipo,positions:toNumber(item.Posiciones)||1,invoice_number:item.Factura,invoice_date:invoiceDate,search_start_date:searchStart,salary_amount:toNumber(item['Monto sin IVA'])}) } return data.filter(r=>r.ref_id)}
+function gridStatus(row){ const due=addBusinessDays(row.search_start_date, rate(row.scale).days); if(!row.grid_sent_date)return {paid:false,early:false,due,label:'Sin fecha',className:'warn'}; const late=diffDays(due,row.grid_sent_date), early=diffDays(row.grid_sent_date,due); const paid=late<=0, isEarly=paid&&early>=2; if(isEarly)return {paid,early:true,due,label:'48h antes',className:''}; if(paid)return {paid,early:false,due,label:'En fecha',className:''}; return {paid:false,early:false,due,label:`Fuera ${late} dias`,className:'bad'} }
+function guaranteeStatus(row){ const release=addCalendarDays(row.candidate_start_date,60); if(!row.candidate_start_date)return {payable:false,releaseDate:'',label:'Sin inicio',className:'warn'}; const days=diffDays(release,$('liquidationDate').value); if(days>=0)return {payable:true,releaseDate:release,label:'Liberada',className:''}; return {payable:false,releaseDate:release,label:`Pendiente ${Math.abs(days)} dias`,className:'warn'} }
+function visibleSets(){ const selected=$('monthFilter').value; const closing=selected==='Todos'?rows:rows.filter(r=>r.month_label===selected); const guarantees=selected==='Todos'?[]:rows.filter(r=>{ const inPolicy=monthIndex(r.month_label)>=monthIndex(POLICY_START_MONTH); const before=monthIndex(r.month_label)<monthIndex(selected); if(!inPolicy||!before)return false; if(r.month_label===POLICY_START_MONTH)return true; return !paidGuarantees.has(r.ref_id) }); return {closing,guarantees} }
+function calculate(){ const {closing,guarantees}=visibleSets(); const totals={closed:0,closing:0,grid:0,guarantee:0,early:0,productivity:0,bonus:0,total:0}; closing.forEach(r=>{ if(r.is_warranty_process)return; const p=parts(r.scale), gs=gridStatus(r); totals.closed+=r.positions||1; totals.closing+=p.closing; if(gs.paid)totals.grid+=p.grid; if(gs.early)totals.early+=toNumber($('earlyBonus').value) }); guarantees.forEach(r=>{ if(r.is_warranty_process)return; const p=parts(r.scale), st=guaranteeStatus(r); if(st.payable)totals.guarantee+=p.guarantee }); totals.productivity=totals.closed>=toNumber($('productivityMin').value)?toNumber($('productivityBonus').value):0; totals.bonus=totals.early+totals.productivity; totals.total=totals.closing+totals.grid+totals.guarantee+totals.bonus; return {closing,guarantees,totals} }
+async function loadAll(){ const [settingsRes, procRes, adjRes, paidRes, liqRes]=await Promise.all([
+  sb.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle(),
+  sb.from('processes').select('*').eq('user_id',currentUser.id).order('invoice_date'),
+  sb.from('process_adjustments').select('*').eq('user_id',currentUser.id),
+  sb.from('paid_guarantees').select('*').eq('user_id',currentUser.id),
+  sb.from('liquidations').select('*').eq('user_id',currentUser.id).order('saved_at',{ascending:false})
+]); if(settingsRes.error)throw settingsRes.error; settings=settingsRes.data || {consultant_name:'',consultant_level:'junior',early_bonus:25000,productivity_bonus:200000,productivity_min:6}; if(!settingsRes.data) await sb.from('user_settings').insert({user_id:currentUser.id}); const adj=new Map((adjRes.data||[]).map(a=>[a.ref_id,a])); rows=(procRes.data||[]).map(p=>{const a=adj.get(p.ref_id)||{}; const scale=a.scale_amount||scaleForSalary(p.salary_amount); return {...p,...a,scale,is_warranty_process:!!a.is_warranty_process}}); paidGuarantees=new Set((paidRes.data||[]).map(p=>p.ref_id)); liquidations=liqRes.data||[]; render() }
+function render(){ $('consultantName').value=settings.consultant_name||''; $('levelSelect').value=settings.consultant_level||'junior'; $('earlyBonus').value=settings.early_bonus||25000; $('productivityBonus').value=settings.productivity_bonus||200000; $('productivityMin').value=settings.productivity_min||($('levelSelect').value==='senior'?8:6); if(!$('liquidationDate').value)$('liquidationDate').value=todayInput(); const selected=$('monthFilter').value || 'Todos'; const months=[...new Set(rows.map(r=>r.month_label).filter(Boolean))].sort((a,b)=>monthIndex(a)-monthIndex(b)); $('monthFilter').innerHTML=['Todos',...months].map(m=>`<option ${m===selected?'selected':''}>${m}</option>`).join(''); renderTable(); renderRates(); renderHistory(); renderTotals() }
+function renderTotals(){ const c=calculate().totals; $('closedCount').textContent=c.closed; $('closingTotal').textContent=money(c.closing); $('gridTotal').textContent=money(c.grid); $('guaranteeTotal').textContent=money(c.guarantee); $('bonusTotal').textContent=money(c.bonus); $('grandTotal').textContent=money(c.total) }
+function renderTable(){ const c=calculate(); const all=[...c.closing.map(r=>({...r,section:'Mes'})),...c.guarantees.map(r=>({...r,section:'Garantia pendiente'}))]; $('processRows').innerHTML=all.map(r=>{ const p=parts(r.scale), gs=gridStatus(r), qt=guaranteeStatus(r); const total=r.is_warranty_process?0:(r.section==='Mes'?p.closing+(gs.paid?p.grid:0)+(gs.early?toNumber($('earlyBonus').value):0):(qt.payable?p.guarantee:0)); return `<tr><td>${r.ref_id}</td><td><strong>${r.client_name||''}</strong><br><span class="muted">${r.search_name||''}</span></td><td>${r.month_label||''}<br><span class="muted">${r.section}</span></td><td>${rate(r.scale).name}</td><td class="money">${money(r.salary_amount)}</td><td>${displayDate(r.search_start_date)}</td><td><div class="date-stack">${r.invoice_number||''}<span>${displayDate(r.invoice_date)}</span></div></td><td>${displayDate(gs.due)}</td><td><input class="mini" type="date" value="${r.grid_sent_date||''}" onchange="saveProcess('${r.ref_id}',{grid_sent_date:this.value})"></td><td><input class="mini" type="date" value="${r.candidate_start_date||''}" onchange="saveProcess('${r.ref_id}',{candidate_start_date:this.value})"></td><td>${displayDate(qt.releaseDate)}</td><td><span class="pill ${r.section==='Mes'?gs.className:qt.className}">${r.section==='Mes'?gs.label:qt.label}</span></td><td><button class="toggle ${r.is_warranty_process?'active':''}" onclick="saveProcess('${r.ref_id}',{is_warranty_process:${!r.is_warranty_process}})">${r.is_warranty_process?'Si':'No'}</button></td><td class="num money">${money(total)}</td></tr>` }).join('') || '<tr><td colspan="14" class="center muted">Importa el CSV para comenzar.</td></tr>' }
+function renderRates(){ $('ratesRows').innerHTML=Object.entries(RATES).map(([scale,r])=>{const p=parts(scale); return `<tr><td>${r.name}</td><td>${r.range}</td><td class="center">${r.days}</td><td class="money">${money(scale)}</td><td class="money">${money(p.grid)}</td><td class="money">${money(p.guarantee)}</td><td class="money">${money(p.closing)}</td></tr>`}).join('') }
+function renderHistory(){ $('historyRows').innerHTML=liquidations.map(l=>`<tr><td>${displayDate(l.saved_at)}</td><td>${l.consultant_name}</td><td>${l.month_label}</td><td>${l.closed_count}</td><td class="num money">${money(l.total_amount)}</td></tr>`).join('') || '<tr><td colspan="5" class="center muted">Todavia no hay liquidaciones guardadas.</td></tr>' }
+async function saveSettings(){ const level=$('levelSelect').value, min=level==='senior'?8:6; settings={...settings,consultant_name:$('consultantName').value,consultant_level:level,early_bonus:toNumber($('earlyBonus').value)||25000,productivity_bonus:toNumber($('productivityBonus').value)||200000,productivity_min:toNumber($('productivityMin').value)||min}; await sb.from('user_settings').upsert({...settings,user_id:currentUser.id,updated_at:new Date().toISOString()}); renderTotals() }
+async function saveProcess(ref, patch){ const row=rows.find(r=>r.ref_id===ref); const payload={user_id:currentUser.id,ref_id:ref,scale_amount:row.scale,grid_sent_date:row.grid_sent_date||null,candidate_start_date:row.candidate_start_date||null,is_warranty_process:!!row.is_warranty_process,pay_closing:true,pay_guarantee:true,...patch,updated_at:new Date().toISOString()}; await sb.from('process_adjustments').upsert(payload); Object.assign(row,payload); renderTable(); renderTotals() }
+window.saveProcess=saveProcess;
+async function importCsv(){ const f=$('fileInput').files[0]; if(!f){setStatus('Selecciona un CSV.');return} const data=extractFacturadas(parseCsv(await f.text())); if(!data.length){setStatus('No encontre posiciones facturadas en el archivo.');return} const {error}=await sb.from('processes').upsert(data); if(error){setStatus(error.message);return} await sb.from('import_batches').insert({user_id:currentUser.id,filename:f.name,row_count:data.length}); setStatus(`Importados ${data.length} procesos.`); await loadAll() }
+async function saveMonth(){ await saveSettings(); const c=calculate(); const selected=$('monthFilter').value; const consultant=$('consultantName').value||'Sin consultora'; const payload={user_id:currentUser.id,consultant_name:consultant,month_label:selected,liquidation_date:$('liquidationDate').value,closed_count:c.totals.closed,closing_total:c.totals.closing,grid_total:c.totals.grid,guarantee_total:c.totals.guarantee,bonus_total:c.totals.bonus,total_amount:c.totals.total,saved_at:new Date().toISOString()}; const {error}=await sb.from('liquidations').upsert(payload); if(error){setStatus(error.message);return} const paid=c.guarantees.filter(r=>r.month_label!==POLICY_START_MONTH&&!r.is_warranty_process&&guaranteeStatus(r).payable).map(r=>({user_id:currentUser.id,ref_id:r.ref_id,liquidation_month:selected,liquidation_date:$('liquidationDate').value})); if(paid.length) await sb.from('paid_guarantees').upsert(paid); setStatus('Liquidacion guardada.'); await loadAll() }
+function exportCsv(){ const c=calculate(); const lines=[['Tipo','Ref','Cliente','Proceso','Mes','Comision'].join(';')]; [...c.closing.map(r=>['Mes',r]),...c.guarantees.map(r=>['Garantia',r])].forEach(([type,r])=>lines.push([type,r.ref_id,r.client_name,r.search_name,r.month_label].map(v=>`"${String(v||'').replaceAll('"','""')}"`).join(';'))); lines.push(['TOTAL','','','','',c.totals.total].join(';')); const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`liquidacion-${$('monthFilter').value}.csv`; a.click(); URL.revokeObjectURL(a.href) }
+function setStatus(t){ $('status').textContent=t; $('authStatus').textContent=t }
+async function login(){ const {error}=await sb.auth.signInWithPassword({email:$('authEmail').value,password:$('authPassword').value}); if(error)setStatus(error.message) }
+async function signup(){ const {error}=await sb.auth.signUp({email:$('authEmail').value,password:$('authPassword').value}); setStatus(error?error.message:'Usuario creado. Revisa el correo si Supabase pide confirmacion.') }
+async function init(){ if(SUPABASE_URL.includes('TU_')){ $('authStatus').textContent='Falta configurar Supabase URL y anon key en public/index.html.'; return } const {data}=await sb.auth.getSession(); currentUser=data.session?.user||null; if(!currentUser){ $('authBox').classList.remove('hidden'); $('app').classList.add('hidden'); return } $('authBox').classList.add('hidden'); $('app').classList.remove('hidden'); $('userLine').textContent=`Conectado: ${currentUser.email}`; await loadAll() }
+$('loginBtn').onclick=login; $('signupBtn').onclick=signup; $('logoutBtn').onclick=async()=>{await sb.auth.signOut(); location.reload()}; $('importBtn').onclick=importCsv; $('saveMonthBtn').onclick=saveMonth; $('exportBtn').onclick=exportCsv; ['consultantName','levelSelect','earlyBonus','productivityBonus','productivityMin','liquidationDate','monthFilter'].forEach(id=>$(id).addEventListener('change',()=>{saveSettings(); render()})); sb.auth.onAuthStateChange(()=>init()); init();
+</script>
+</body>
+</html>
